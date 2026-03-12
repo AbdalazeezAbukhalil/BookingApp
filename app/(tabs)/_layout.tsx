@@ -5,14 +5,16 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
+        headerTintColor: "#fff",
+        headerStyle: { backgroundColor: "#3C5898" },
         tabBarStyle: { display: "none" },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
-          title: "Home",
+          title: "React Native Post Manager",
         }}
       />
     </Tabs>
