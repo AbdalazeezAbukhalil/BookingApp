@@ -1,9 +1,9 @@
 import axios from "axios";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Button,
   FlatList,
   StyleSheet,
   Text,
@@ -11,25 +11,26 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
+import { usePostStore } from "../store/appStore";
 interface Post {
-  id: number;
+  id: string;
   title: string;
   body: string;
 }
 export default function Api() {
-  const [data, setData] = useState<Post[]>([]);
-  const [editId, setEditId] = useState<number | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [loading, setLoading] = useState(false);
-  const handleDelete = (id: number) => {
+
+  const posts = usePostStore((state) => state.posts);
+  const handleDelete = (id: string) => {
     Alert.alert("Are you sure?", "This post will be deleted", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Yes",
         onPress: () => {
-          setData(data.filter((post) => post.id !== id));
+          usePostStore.getState().deletePost(id);
           axios
             .delete(`https://jsonplaceholder.typicode.com/posts/${id}`)
             .then(() => {
@@ -40,57 +41,9 @@ export default function Api() {
     ]);
   };
 
-  const startEdit = (post: Post) => {
-    setEditId(post.id);
-    setTitle("Title");
-    setBody("Body");
-  };
-
   const handleUpdate = () => {
-    setLoading(true);
-    setData(
-      data.map((post) =>
-        post.id === editId ? { ...post, title: title, body: body } : post,
-      ),
-    );
-    setEditId(null);
-    axios
-      .put(`https://jsonplaceholder.typicode.com/posts/${editId}`, {
-        title,
-        body,
-      })
-      .then(() => {
-        console.log("Post updated");
-        setTimeout(() => {
-          setLoading(false);
-        }, 300);
-      });
-    Alert.alert("Post Updated", "The post has been updated successfully", [
-      { text: "OK" },
-    ]);
-  };
-
-  const addNewPost = () => {
-    setLoading(true);
-    const newPost: Post = {
-      id: Math.max(...data.map((p) => p.id), 0) + 1,
-      title: "Click the Update Button to Edit this Post",
-      body: "",
-    };
-    setData([newPost, ...data]);
-    axios
-      .post("https://jsonplaceholder.typicode.com/posts", newPost)
-      .then(() => {
-        setTimeout(() => {
-          setLoading(false);
-        }, 300);
-        console.log("Post created");
-      });
-    Alert.alert(
-      "New Post Created",
-      "Click the Update Button to Edit this Post",
-      [{ text: "OK" }],
-    );
+    if (!editId) return;
+    router.push({ pathname: "/updateForm", params: { id: editId } });
   };
 
   useEffect(() => {
@@ -99,7 +52,13 @@ export default function Api() {
       .get("https://jsonplaceholder.typicode.com/posts")
       .then((response) => {
         setTimeout(() => {
-          setData(response.data);
+          // Convert all ids to string for consistency
+          const posts: Post[] = response.data.map((post: any) => ({
+            ...post,
+            id: post.id.toString(),
+          }));
+          usePostStore.getState().clearPosts();
+          posts.forEach((post) => usePostStore.getState().addPost(post));
           setLoading(false);
         }, 200);
       })
@@ -113,14 +72,9 @@ export default function Api() {
     <View style={{ padding: 20 }}>
       {loading && <ActivityIndicator size="large" color="#007AFF" />}
 
-      {loading === false && (
-        <View style={styles.create}>
-          <Button title="Create New Post" onPress={addNewPost} color="#fff" />
-        </View>
-      )}
       <FlatList
-        data={data}
-        keyExtractor={(item) => item.id.toString()}
+        data={posts}
+        keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View style={styles.card}>
             {editId === item.id ? (
@@ -158,7 +112,12 @@ export default function Api() {
                 <View style={styles.row}>
                   <TouchableOpacity
                     style={styles.updateBtn}
-                    onPress={() => startEdit(item)}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/updateForm",
+                        params: { id: item.id },
+                      })
+                    }
                   >
                     <Text style={styles.btnText}>Update</Text>
                   </TouchableOpacity>
@@ -227,10 +186,5 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 15,
     textAlign: "center",
-  },
-  create: {
-    margin: 10,
-    backgroundColor: "#3C5898",
-    borderRadius: 10,
   },
 });
